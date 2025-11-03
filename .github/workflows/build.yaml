@@ -23,6 +23,9 @@ jobs:
         run: |
           echo "tag_name=${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}" >> $GITHUB_OUTPUT
 
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
       - name: Validate tag exists
         run: |
           git fetch --tags
