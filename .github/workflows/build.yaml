@@ -4,11 +4,6 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
-    inputs:
-      tag:
-        description: "Tag to build and release"
-        required: true
-        type: string
 
 permissions:
   contents: write
@@ -18,21 +13,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Set release tag
-        id: set_tag
-        run: |
-          echo "tag_name=${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}" >> $GITHUB_OUTPUT
-
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Validate tag exists
+      - name: Set release tag
+        id: set_tag
         run: |
-          git fetch --tags
-          git rev-parse "refs/tags/${{ steps.set_tag.outputs.tag_name }}" || {
-            echo "❌ Tag not found: ${{ steps.set_tag.outputs.tag_name }}"
-            exit 1
-          }
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "Using pushed tag: ${{ github.ref_name }}"
+            echo "tag_name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          else
+            git fetch --tags
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+            echo "Latest tag: $LATEST_TAG"
+            echo "tag_name=$LATEST_TAG" >> $GITHUB_OUTPUT
+          fi
 
       - name: Checkout Related Tag
         uses: actions/checkout@v4
