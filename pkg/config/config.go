@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	alphabets = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	edgeIDLength  = 8
+	alphabets    = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	edgeIDLength = 16
 )
 
 // Config holds the application configuration
