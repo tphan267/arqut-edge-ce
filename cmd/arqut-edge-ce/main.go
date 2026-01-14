@@ -22,6 +22,8 @@ import (
 	"github.com/arqut/arqut-edge-ce/pkg/storage"
 )
 
+var version = "0.1.1"
+
 func main() {
 	// Load configuration
 	cfg, err := config.Load()
@@ -47,7 +49,7 @@ func main() {
 		appLogger.SetLevel(logger.InfoLevel)
 	}
 
-	appLogger.Info("Starting Arqut Edge Community Edition...")
+	appLogger.Info("Starting Arqut Edge Community Edition... Version: %s", version)
 	appLogger.Info("API Key: %s...", maskAPIKey(cfg.APIKey))
 
 	// Initialize storage
