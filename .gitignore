@@ -13,9 +13,12 @@
 dist/
 bin/
 pkg/mod/
+tmp/
 
 # Environment files
+.air.*
 .env
+.arqut.*
 .env.local
 .env.*.local
 

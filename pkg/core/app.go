@@ -3,7 +3,7 @@ package core
 import (
 	"context"
 
-	"github.com/arqut/arqut-edge-ce/pkg/providers"
+	"github.com/tphan267/arqut-edge-ce/pkg/providers"
 )
 
 // App defines the core application business logic interface
@@ -15,7 +15,7 @@ type App interface {
 	CheckAccess(ctx context.Context, token, resource, action string) (bool, error)
 
 	// SendData sends data to external integrations
-	SendData(ctx context.Context, token, destination string, data interface{}) error
+	SendData(ctx context.Context, token, destination string, data any) error
 
 	// GetMetrics retrieves analytics metrics
 	GetMetrics(ctx context.Context, token string, query providers.MetricsQuery) (*providers.MetricsResult, error)

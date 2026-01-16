@@ -4,23 +4,28 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/arqut/arqut-edge-ce/pkg/logger"
 	"github.com/gorilla/websocket"
+	"github.com/tphan267/arqut-edge-ce/pkg/logger"
+	"github.com/tphan267/arqut-edge-ce/pkg/utils"
 )
 
 // Client handles WebSocket communication with the cloud server
 type Client struct {
-	cloudURL string
-	edgeID   string
-	apiKey   string
-	conn     *websocket.Conn
-	mutex    sync.RWMutex
-	ctx      context.Context
-	cancel   context.CancelFunc
+	cloudURL   string
+	apiPath    string // API path prefix (e.g., "/api/v1" or "/v1")
+	apiKey     string
+	edgeID     string
+	serverAddr string
+	conn       *websocket.Conn
+	mutex      sync.RWMutex
+	ctx        context.Context
+	cancel     context.CancelFunc
 
 	messageHandlers   map[string]MessageHandler
 	onConnectHandlers []OnConnectHandler
@@ -34,13 +39,16 @@ type Client struct {
 	reconnectMutex sync.Mutex
 }
 
-// NewClient creates a new signaling client
+// NewClient creates a new signaling client with default API path "/api/v1"
 func NewClient(cloudURL string, log *logger.Logger) (*Client, error) {
-	ctx, cancel := context.WithCancel(context.Background())
+	return NewClientWithPath(cloudURL, "/api/v1", log)
+}
+
+// NewClientWithPath creates a new signaling client with custom API path
+func NewClientWithPath(cloudURL string, apiPath string, log *logger.Logger) (*Client, error) {
 	return &Client{
 		cloudURL:        cloudURL,
-		ctx:             ctx,
-		cancel:          cancel,
+		apiPath:         apiPath,
 		messageHandlers: make(map[string]MessageHandler),
 		outboundChan:    make(chan *OutboundMessage, 100), // Buffered channel for non-blocking sends
 		logger:          log,
@@ -49,10 +57,14 @@ func NewClient(cloudURL string, log *logger.Logger) (*Client, error) {
 
 // Connect establishes WebSocket connection to the cloud server
 // This function will retry indefinitely in the background if initial connection fails
-func (c *Client) Connect(ctx context.Context, edgeID string, apiKey string) error {
+func (c *Client) Connect(ctx context.Context, apiKey string, edgeID string, serverAddr string) {
 	// Store edge ID and API key for reconnection
-	c.edgeID = edgeID
 	c.apiKey = apiKey
+	c.edgeID = edgeID
+	c.serverAddr = serverAddr
+
+	// Create a new context for the client operations, derived from parent context
+	c.ctx, c.cancel = context.WithCancel(ctx)
 
 	// Attempt initial connection
 	if err := c.connectOnce(ctx); err != nil {
@@ -61,10 +73,8 @@ func (c *Client) Connect(ctx context.Context, edgeID string, apiKey string) erro
 		c.logger.Printf("[Signaling] Will retry in background...")
 		go c.reconnect()
 		// Don't return error - service should continue running
-		return nil
+		return
 	}
-
-	return nil
 }
 
 // connectOnce performs a single connection attempt
@@ -77,7 +87,25 @@ func (c *Client) connectOnce(ctx context.Context) error {
 		cloudURL = "wss://" + after
 	}
 
-	wsURL := fmt.Sprintf("%s/api/v1/signaling/ws/edge?id=%s", cloudURL, c.edgeID)
+	// Append edgeServerAddr as a query parameter
+	host, portStr, err := net.SplitHostPort(c.serverAddr)
+	if err != nil {
+		return fmt.Errorf("failed to parse server address: %w", err)
+	}
+	port, err := net.LookupPort("tcp", portStr)
+	if err != nil {
+		return fmt.Errorf("failed to lookup server port: %w", err)
+	}
+	if host == "" || host == "::" || host == "0.0.0.0" {
+		host = "localhost"
+		// server listens on all interfaces, try to get actual local IPs
+		localIPs, err := utils.GetLocalIPs(true)
+		if err == nil && len(localIPs) > 0 {
+			host = strings.Join(localIPs, ",")
+		}
+	}
+
+	wsURL := fmt.Sprintf("%s%s/signaling/ws/edge?id=%s&host=%s&port=%d&os=%s", cloudURL, c.apiPath, c.edgeID, host, port, runtime.GOOS)
 
 	c.logger.Printf("[Signaling] Connecting to %s", wsURL)
 
@@ -110,7 +138,6 @@ func (c *Client) connectOnce(ctx context.Context) error {
 			c.logger.Printf("[Signaling] OnConnect handler error: %v", err)
 		}
 	}
-
 
 	// Start message reader
 	go c.readMessages()
