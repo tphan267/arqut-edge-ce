@@ -17,8 +17,8 @@ tmp/
 
 # Environment files
 .air.*
-.env
 .arqut.*
+.env
 .env.local
 .env.*.local
 
